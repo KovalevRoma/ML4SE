@@ -1,0 +1,5 @@
+
+/workflow_data
+/.research_storages
+.venv/
+__pycache__/
