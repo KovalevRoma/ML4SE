@@ -28,8 +28,7 @@ MODEL_NAME = "lovedheart/Qwen3.5-4B-FP8"
     gpu="A10G", 
     volumes={"/cache": volume},
     timeout=3600,
-    min_containers=1, # <--- ВОТ ТУТ ИЗМЕНИЛОСЬ
-    allow_concurrent_inputs=10
+    min_containers=1
 )
 @modal.web_server(8000)
 def serve():
