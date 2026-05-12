@@ -2,24 +2,22 @@ import modal
 import subprocess
 import time
 
-# 1. Настраиваем образ: используем правильные параметры для новых версий Modal
 image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04", add_python="3.11")
-    .apt_install("git")
-    .pip_install("torch==2.1.2") 
-    .pip_install(
-        "sglang[all]", 
-        "vllm==0.4.2", 
-        "flash-attn",
-        "transformers",
-        "hf_transfer",
-        extra_options="--no-build-isolation" # Теперь это в правильном месте
+    .apt_install("git", "build-essential")
+    # Ставим инструменты сборки и Torch
+    .pip_install("setuptools==69.5.1", "packaging", "wheel", "torch==2.1.2")
+    # Ставим vLLM отдельно (он потянет 90% нужного для SGLang)
+    .pip_install("vllm==0.4.2", "transformers", "hf_transfer")
+    # ХАК: Ставим sglang БЕЗ зависимостей, чтобы он не лез за битым flashinfer
+    .run_commands(
+        "pip install sglang --no-deps",
+        "pip install fastapi uvicorn uvloop" # Доставляем то, что реально нужно для сервера
     )
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 )
 
 app = modal.App("sglang-qwen-serve")
-
 volume = modal.Volume.from_name("model-cache", create_if_missing=True)
 MODEL_NAME = "lovedheart/Qwen3.5-4B-FP8"
 
@@ -32,6 +30,7 @@ MODEL_NAME = "lovedheart/Qwen3.5-4B-FP8"
 )
 @modal.web_server(8000)
 def serve():
+    # Мы используем vllm как бэкенд внутри sglang (самый стабильный путь сейчас)
     cmd = [
         "python3", "-m", "sglang.launch_server",
         "--model-path", MODEL_NAME,
@@ -41,7 +40,6 @@ def serve():
         "--mem-fraction-static", "0.8"
     ]
 
-    print(f"Запуск SGLang сервера для {MODEL_NAME}...")
+    print(f"Запуск SGLang сервера...")
     process = subprocess.Popen(cmd)
-    time.sleep(30) 
     process.wait()
